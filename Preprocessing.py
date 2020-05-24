@@ -18,6 +18,7 @@ def load_data(data_path):
     test_index = pd.read_csv(test_path)
     test_index = test_index.iloc[:, : 3]
     test_index.columns = frames_columns
+    test_index['song_name'] = [name[1:] for name in test_index['song_name']]
     test_index['lyrics'] = test_index.lyrics.apply(clean_text)
 
     midi_path = os.path.join(data_path, 'midi_files')
@@ -53,7 +54,7 @@ def read_midi_files(path, train_index, test_index):
         elif song_name in test_index['song_name'].values:
             try:
                 pm = pretty_midi.PrettyMIDI(file_path)
-                pm.lyrics = str(test_index[test_index['song_name'] == song_name]['lyrics'].values[0])
+                # pm.lyrics = str(test_index[test_index['song_name'] == song_name]['lyrics'].values[0])
                 train_midi_dict[file[:-4]] = [pm, test_index[test_index['song_name'] == song_name]['lyrics'].values[0]]
             except:
                 print(file)

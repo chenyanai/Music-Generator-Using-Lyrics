@@ -11,7 +11,6 @@ def add_chroma(row):
     return md.get_chroma(times=np.arange(0, len(lyric_vectors))).T
 
 
-
 we = WordEmbedding()
 train_midis, train, test_midis, test = Preprocessing.load_data(r'Data')
 
@@ -26,5 +25,3 @@ train_df['chroma_vectors'] = train_df.apply(add_chroma, axis=1)
 
 # train_df['lyrics_shape'] = train_df['lyrics_vectors'].apply(len)
 # train_df['chroma_shape'] = train_df['chroma_vectors'].apply(lambda x: x.shape)
-
-
