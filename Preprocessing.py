@@ -1,5 +1,6 @@
 import pandas as pd
 import pretty_midi
+from tqdm import tqdm
 import os
 import re
 
@@ -41,7 +42,7 @@ def read_midi_files(path, train_index, test_index):
     train_midi_dict = {}
     test_midi_dict = {}
 
-    for file in os.listdir(path):
+    for file in tqdm(os.listdir(path)):
         file_path = os.path.join(path, file)
         song_name = get_song_name_from_file_name(file)
         if song_name in train_index['song_name'].values:
@@ -55,7 +56,7 @@ def read_midi_files(path, train_index, test_index):
             try:
                 pm = pretty_midi.PrettyMIDI(file_path)
                 # pm.lyrics = str(test_index[test_index['song_name'] == song_name]['lyrics'].values[0])
-                train_midi_dict[file[:-4]] = [pm, test_index[test_index['song_name'] == song_name]['lyrics'].values[0]]
+                test_midi_dict[file[:-4]] = [pm, test_index[test_index['song_name'] == song_name]['lyrics'].values[0]]
             except:
                 print(file)
 
