@@ -21,6 +21,9 @@ def build_model(sequence_length, mid_data_len):
     model = Model(inputs=[melody_input, lyrics_vectors_input], outputs=dense)
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['acc'])
     model.summary()
+    return model
 
 
-model = build_model(10, 10)
+def train_model(model, X, y):
+    model.fit(x=[X['melody_vectors'], X['lyric_vectors']], y=y, batch_size=256, epochs=3, verbose=1)
+    return model

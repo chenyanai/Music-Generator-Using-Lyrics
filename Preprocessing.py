@@ -3,6 +3,7 @@ import pretty_midi
 from tqdm import tqdm
 import os
 import re
+import numpy as np
 
 DATA_PATH = r'\Data'
 
@@ -68,5 +69,35 @@ def get_song_name_from_file_name(file_name):
     name = name.replace('_', ' ')
     return name.lower()
 
-# train_midis, train, test_midis, test = load_data(r'Data')
-# print('hi')
+def convert_data_to_model_input(df, sequence_length):
+    """
+
+    :param df:
+                df columns:
+                    md - prettyMIDI object
+                    lyrics - string with the song lyrics
+                    lyrics_vectors - list of numpy arrays, each array is 300 long and represents the embedding of a
+                    word in the lyrics
+                    chroma_vectors - numpy array that contains data on the melody, the length of the array equals to
+                    the number of the words in the lyrics
+    :return: data fitted to be used for training the model
+    """
+
+    X = {
+        'lyric_vectors': list(),
+        'melody_vectors': list()
+    }
+    y = list()
+
+    for i, song_data in df.iterrows():
+
+        melody_data = song_data['chroma_vectors']
+
+        if len(melody_data) >= sequence_length + 1:
+            for j in range(len(melody_data)):
+                if len(melody_data) - 1 > j + sequence_length :
+                    X['lyric_vectors'].append(song_data['lyrics_vectors'][j])
+                    X['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
+                    y.append(song_data['lyrics_vectors'][j + sequence_length])
+
+    return X, y
