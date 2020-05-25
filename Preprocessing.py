@@ -29,13 +29,12 @@ def load_data(data_path):
 
 
 def clean_text(text:str)->str:
-    text = re.sub(r'\[.*?\]', '', text)
-    text = re.sub(r'\(.*?\)', '', text)
+    text = re.sub(r'\[.*?\]', '', text) # clean [] and every thing inside
+    text = re.sub(r'\(.*?\)', '', text) # clean () and every thing inside
     text = text.replace('&', '')
     text = text.replace('--', '')
     text = text.replace(':', '')
-    # text = text.replace('[chorus:]', '')
-    # text = text.replace('[chorus: ]', '')
+
     return text
 
 def read_midi_files(path, train_index, test_index):
