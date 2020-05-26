@@ -11,12 +11,14 @@ SEQ_LEN = 5
 TRAIN_PATH = 'Data/train_data.pickle'
 TEST_PATH = 'Data/test_data.pickle'
 
+start_fresh = False
+
 def add_chroma(row):
     md = row['md']
     lyric_vectors = row['lyrics_vectors']
     return md.get_chroma(fs=md.get_end_time()/len(lyric_vectors), times=np.arange(0, md.get_end_time(),md.get_end_time()/len(lyric_vectors) )).T
 
-if not os.path.exists(TRAIN_PATH):
+if not os.path.exists(TRAIN_PATH) or start_fresh:
 
     we = WordEmbedding()
     train_midis, train, test_midis, test = Preprocessing.load_data(r'Data')
