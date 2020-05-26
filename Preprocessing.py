@@ -99,5 +99,5 @@ def convert_data_to_model_input(df, sequence_length):
                     X['lyric_vectors'].append(song_data['lyrics_vectors'][j])
                     X['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
                     y.append(song_data['lyrics_vectors'][j + sequence_length])
-
+    y = np.vstack(y)
     return X, y

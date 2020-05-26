@@ -33,7 +33,7 @@ mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 model = Model.build_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size)
 
 Model.train_model(model, X_train, y_train)
+# Model.train_model(model, x_test, y_test)
 
-print('test')
 # train_df['lyrics_shape'] = train_df['lyrics_vectors'].apply(len)
 # train_df['chroma_shape'] = train_df['chroma_vectors'].apply(lambda x: x.shape)
