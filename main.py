@@ -22,6 +22,9 @@ if not os.path.exists(TRAIN_PATH) or start_fresh:
 
     we = WordEmbedding()
     train_midis, train, test_midis, test = Preprocessing.load_data(r'Data')
+# we = WordEmbedding()
+we = None
+train_midis, train, test_midis, test = Preprocessing.load_data(r'Data', we)
 
     train_df = pd.DataFrame.from_records(list(train_midis.values()), columns=['md','lyrics'])
     test_df = pd.DataFrame.from_records(list(test_midis.values()), columns=['md','lyrics'])
@@ -50,5 +53,8 @@ mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 
 model = Model.build_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size)
 
-# Model.train_model(model, X_train, y_train)
-Model.train_model(model, x_test, y_test)
+Model.train_model(model, X_train, y_train)
+# Model.train_model(model, x_test, y_test)
+
+# train_df['lyrics_shape'] = train_df['lyrics_vectors'].apply(len)
+# train_df['chroma_shape'] = train_df['chroma_vectors'].apply(lambda x: x.shape)

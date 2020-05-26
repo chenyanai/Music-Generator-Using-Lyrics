@@ -17,3 +17,5 @@ class WordEmbedding:
         vectors = [self.get_word_vec(x) for x in sentence.split(' ')]
         return list(filter(lambda x: x is not None , vectors))
 
+    def get_closest_word(self, vector):
+        self.model.similar_by_vector(vector, topn=1)
