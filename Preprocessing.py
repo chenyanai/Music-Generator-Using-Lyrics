@@ -90,23 +90,20 @@ def clean_text(text:str)->str:
 def read_midi_files(path, train_index, test_index, vocab_size):
     train_midi_dict = {}
     test_midi_dict = {}
-    testing = 5
     for file in tqdm(os.listdir(path)):
         file_path = os.path.join(path, file)
         song_name = get_song_name_from_file_name(file)
         if song_name in train_index['song_name'].values:
             try:
-                if testing > 0:
-                    pm = pretty_midi.PrettyMIDI(file_path)
-                    song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
+                pm = pretty_midi.PrettyMIDI(file_path)
+                song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
 
-                    # one_hot_lyrics = np.zeros((len(song_lyrics), vocab_size + 1))
-                    # one_hot_lyrics[np.arange(len(song_lyrics)), song_lyrics] = 1
+                # one_hot_lyrics = np.zeros((len(song_lyrics), vocab_size + 1))
+                # one_hot_lyrics[np.arange(len(song_lyrics)), song_lyrics] = 1
 
-                    # song_lyrics = tokenizer.texts_to_matrix(one_hot_lyrics)
+                # song_lyrics = tokenizer.texts_to_matrix(one_hot_lyrics)
 
-                    train_midi_dict[file[:-4]] = [pm, song_lyrics]
-                    testing -= 1
+                train_midi_dict[file[:-4]] = [pm, song_lyrics]
             except:
                 print(file)
         elif song_name in test_index['song_name'].values:
