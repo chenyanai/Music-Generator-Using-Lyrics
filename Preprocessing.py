@@ -46,13 +46,13 @@ def load_data(data_path, we_model):
     with open('embedding_matrix.pickle', 'rb') as handle:
         embedding_matrix = pickle.load(handle)
 
-    vocab_size = len(tokenizer.word_index) + 1
+    vocab_size = len(tokenizer.word_index)
     midi_path = os.path.join(data_path, 'midi_files')
     train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
     test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
     train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
 
-    return train_midis, train_index, test_midis, test_index
+    return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size
 
 
 def prepare_lyrics(test_index, train_index, we_model):
@@ -98,27 +98,32 @@ def read_midi_files(path, train_index, test_index, vocab_size):
                 pm = pretty_midi.PrettyMIDI(file_path)
                 song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
 
-                one_hot_lyrics = np.zeros((len(song_lyrics), vocab_size + 1))
-                one_hot_lyrics[np.arange(len(song_lyrics)), song_lyrics] = 1
+                # one_hot_lyrics = np.zeros((len(song_lyrics), vocab_size + 1))
+                # one_hot_lyrics[np.arange(len(song_lyrics)), song_lyrics] = 1
 
                 # song_lyrics = tokenizer.texts_to_matrix(one_hot_lyrics)
 
-                train_midi_dict[file[:-4]] = [pm, one_hot_lyrics]
+                train_midi_dict[file[:-4]] = [pm, song_lyrics]
             except:
                 print(file)
         elif song_name in test_index['song_name'].values:
             try:
                 pm = pretty_midi.PrettyMIDI(file_path)
-                song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
+                song_lyrics = test_index[test_index['song_name'] == song_name]['lyrics_sequence'].values[0]
 
-                one_hot_lyrics = np.zeros((len(song_lyrics), vocab_size + 1))
-                one_hot_lyrics[np.arange(len(song_lyrics)), song_lyrics] = 1
+                one_hot_by_max_value(song_lyrics, vocab_size)
 
-                test_midi_dict[file[:-4]] = [pm, one_hot_lyrics]
+                test_midi_dict[file[:-4]] = [pm, song_lyrics]
             except:
                 print(file)
 
     return train_midi_dict, test_midi_dict
+
+
+def one_hot_by_max_value(data, vocab_size):
+    one_hot_array = np.zeros((len(data), vocab_size + 1))
+    one_hot_array[np.arange(len(data)), data] = 1
+    return one_hot_array
 
 # def convert_lyrics_to_one_hot_array(lyrics, tokenizer):
 
@@ -144,7 +149,7 @@ def convert_data_to_model_input(df, sequence_length):
     """
 
     X = {
-        'lyric_vectors': list(),
+        'lyrics': list(),
         'melody_vectors': list()
     }
     y = list()
@@ -156,8 +161,8 @@ def convert_data_to_model_input(df, sequence_length):
         if len(melody_data) >= sequence_length + 1:
             for j in range(len(melody_data)):
                 if len(melody_data) - 1 > j + sequence_length :
-                    X['lyric_vectors'].append(song_data['lyrics_vectors'][j])
+                    X['lyrics'].append(song_data['lyrics'][j])
                     X['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
-                    y.append(song_data['lyrics_vectors'][j + sequence_length])
+                    y.append(song_data['lyrics'][j + sequence_length])
     y = np.vstack(y)
     return X, y
