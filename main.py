@@ -11,7 +11,7 @@ SEQ_LEN = 20
 TRAIN_PATH = 'Data/train_data.pickle'
 TEST_PATH = 'Data/test_data.pickle'
 
-start_fresh = True
+start_fresh = False
 
 def add_chroma(row):
     md = row['md']
@@ -20,11 +20,9 @@ def add_chroma(row):
 
 if not os.path.exists(TRAIN_PATH) or start_fresh:
 
-    # we = WordEmbedding()
     # train_midis, train, test_midis, test = Preprocessing.load_data(r'Data')
 
-    we = None
-    train_midis, train, test_midis, test, embedding_matrix, vocab_size = Preprocessing.load_data(r'Data', we)
+    train_midis, train, test_midis, test, embedding_matrix, vocab_size = Preprocessing.load_data(r'Data')
 
     train_df = pd.DataFrame.from_records(list(train_midis.values()), columns=['md','lyrics'])
     test_df = pd.DataFrame.from_records(list(test_midis.values()), columns=['md','lyrics'])
@@ -47,15 +45,17 @@ else:
         X_train, y_train = pickle.load(f)
     with open(TEST_PATH, 'rb') as f:
         x_test, y_test = pickle.load(f)
+    with open('embedding_matrix.pickle', 'rb') as handle:
+        embedding_matrix = pickle.load(handle)
+    vocab_size = embedding_matrix.shape[0]-1
 
+print(f'vocab_size: {vocab_size}')
 
 mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 
 model = Model.build_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size,
                           embedding_matrix=embedding_matrix,vocab_size=vocab_size)
 
-Model.train_model(model, X_train, y_train, vocab_size)
+history = Model.train_model(model, X_train, y_train, vocab_size)
 # Model.train_model(model, x_test, y_test)
 
-# train_df['lyrics_shape'] = train_df['lyrics_vectors'].apply(len)
-# train_df['chroma_shape'] = train_df['chroma_vectors'].apply(lambda x: x.shape)

@@ -24,10 +24,9 @@ def build_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
     dense = Dense(vocab_size + 1, activation='softmax', name='last_dense')(dropout) # Predicting the next locations of the defense players
 
     model = Model(inputs=[melody_input, lyrics_vectors_input], outputs=dense)
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['acc'])
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['mse'])
     model.summary()
     return model
-
 
 def train_model(model, X, y, vocab_size):
 
@@ -41,13 +40,18 @@ def train_model(model, X, y, vocab_size):
     for array in X['melody_vectors']:
         X_melody.append(normalize(array))
     X_melody = np.array(X_melody)
-    batch_size = 16
-    model.fit(x=[X_melody, X_lyrics],
+    batch_size = 1024
+    epochs = 200
+
+    history = model.fit(x=[X_melody, X_lyrics],
               y=y,
               batch_size=batch_size,
-              epochs=3,
+              epochs=epochs,
               verbose=1,
-              steps_per_epoch=int(len(X_lyrics) / batch_size))
-              # callbacks=[tensorboard_callback])
+              steps_per_epoch=int(len(X_lyrics) / batch_size),
+              callbacks=[tensorboard_callback],
+              )
+
     model.save("model.h5")
-    return model
+    return history
+

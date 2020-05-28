@@ -8,15 +8,15 @@ import re
 import numpy as np
 import pickle
 
+from WordEmbedding import WordEmbedding
 
 # # loading
 # with open('tokenizer.pickle', 'rb') as handle:
 #     tokenizer = pickle.load(handle)
 
-
 DATA_PATH = r'\Data'
 
-def load_data(data_path, we_model):
+def load_data(data_path):
     frames_columns = ['artist', 'song_name', 'lyrics']
 
     train_path = os.path.join(data_path, 'lyrics_train_set.csv')
@@ -32,22 +32,25 @@ def load_data(data_path, we_model):
     test_index['song_name'] = [name[1:] for name in test_index['song_name']]
     test_index['lyrics'] = test_index.lyrics.apply(clean_text)
 
-    # tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
+    we_model = WordEmbedding()
 
-    # saving
-    # with open('tokenizer.pickle', 'wb') as handle:
-    #     pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
+
+    #saving
+    with open('tokenizer.pickle', 'wb') as handle:
+        pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open('embedding_matrix.pickle', 'wb') as handle:
+        pickle.dump(embedding_matrix, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # with open('tokenizer.pickle', 'rb') as handle:
+    #     tokenizer = pickle.load(handle)
     #
-    # with open('embedding_matrix.pickle', 'wb') as handle:
-    #     pickle.dump(embedding_matrix, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open('embedding_matrix.pickle', 'rb') as handle:
+    #     embedding_matrix = pickle.load(handle)
+    #
+    # vocab_size = len(tokenizer.word_index)
 
-    with open('tokenizer.pickle', 'rb') as handle:
-        tokenizer = pickle.load(handle)
-
-    with open('embedding_matrix.pickle', 'rb') as handle:
-        embedding_matrix = pickle.load(handle)
-
-    vocab_size = len(tokenizer.word_index)
     midi_path = os.path.join(data_path, 'midi_files')
     train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
     test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
@@ -61,7 +64,7 @@ def prepare_lyrics(test_index, train_index, we_model):
     tokenizer = Tokenizer()
     lyrics = list(train_index['lyrics'].values) + list(test_index['lyrics'].values)
     tokenizer.fit_on_texts(lyrics)
-    vocab_size = len(tokenizer.word_index) + 1
+    vocab_size = len(tokenizer.word_index)
     embedding_matrix = create_vectors_matrix(tokenizer, vocab_size, we_model)
 
     return tokenizer, embedding_matrix, vocab_size
@@ -69,7 +72,7 @@ def prepare_lyrics(test_index, train_index, we_model):
 def create_vectors_matrix(tokenizer, vocab_size, we_model):
     # create a weight matrix for words in training docs
 
-    embedding_matrix = np.zeros((vocab_size, 300))
+    embedding_matrix = np.zeros((vocab_size+1, 300))
     for word, i in tokenizer.word_index.items():
         embedding_vector = we_model.get_word_vec(word)
         if embedding_vector is not None:
