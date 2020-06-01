@@ -60,7 +60,7 @@ mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 # Model.train_model(model, x_test, y_test)
 
 # tokenizer = None
-with open('tokenizer.pickle', 'rb') as handle:
+with open('Data/tokenizer.pickle', 'rb') as handle:
     tokenizer = pickle.load(handle)
     reverse_word_map = dict(map(reversed, tokenizer.word_index.items()))
     word_map = tokenizer.word_index
