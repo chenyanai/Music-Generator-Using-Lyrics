@@ -48,7 +48,7 @@ else:
     with open('embedding_matrix.pickle', 'rb') as handle:
         embedding_matrix = pickle.load(handle)
     vocab_size = embedding_matrix.shape[0]-1
-    we_model = WordEmbedding()
+    # we_model = WordEmbedding()
 
 print(f'vocab_size: {vocab_size}')
 
@@ -59,7 +59,13 @@ mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 # history= Model.train_model(model, X_train, y_train, vocab_size)
 # Model.train_model(model, x_test, y_test)
 
+# tokenizer = None
+with open('tokenizer.pickle', 'rb') as handle:
+    tokenizer = pickle.load(handle)
+    reverse_word_map = dict(map(reversed, tokenizer.word_index.items()))
+    word_map = tokenizer.word_index
+
 model = Model.load("model.h5")
 model.summary()
-song = Model.generate_song(model, x_test, we=we_model.model)
-
+song = Model.generate_song(model, x_test, words_dict=word_map, reverse_word_dict=reverse_word_map)
+print(song)

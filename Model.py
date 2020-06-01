@@ -57,40 +57,37 @@ def train_model(model, X, y, vocab_size):
     model.save("model.h5")
     return history
 
-def predict_word(model:Model, melody, word:str, vocab:dict, index2word):
-    word_index = vocab[word].index
+def predict_word(model:Model, melody, word:str, vocab:dict, reverse_word_dict:dict):
+    # word_index = vocab[word].index
+    word_index = vocab[word]
     X = [np.array([melody]), np.vstack([word_index])]
-    predicted_vec = model.predict(X)
+    # predicted_vec = model.predict(X)
+    predicted_vec = model.predict(x=[np.array([melody]), np.array([word_index])])
     max_index = np.argmax(predicted_vec)
-    one_hot_array = np.zeros((1, len(vocab) + 1))
+    one_hot_array = np.zeros(shape=(len(vocab) + 1))
     one_hot_array[max_index] = 1
-    next_word = index2word[max_index]
+    # next_word = index2word[max_index]
+    next_word = reverse_word_dict[max_index]
     return next_word, one_hot_array
 
 
-def generate_song(model:Model, X, we:KeyedVectors, song_lenth=50):
-    first_word = 'hi' # TODO change to random pick from vocab
+def generate_song(model:Model, X, words_dict, reverse_word_dict, song_length=50, ):
+    first_word = 'cry' # TODO change to random pick from vocab
     song = [first_word]
-    vocab = we.wv.vocab
-    index2word = we.index2word
-    melody = X['melody_vectors'][:song_lenth]
+    # vocab = we.wv.vocab
+    # index2word = we.index2word
+    melody = X['melody_vectors'][:song_length]
     X_melody = []
     for array in melody:
         X_melody.append(normalize(array))
     X_melody = np.array(X_melody)
-    next_word, one_hot_array = predict_word(model, X_melody[0], first_word, vocab, index2word)
+    next_word, one_hot_array = predict_word(model, X_melody[0], first_word, words_dict, reverse_word_dict)
     song.append(next_word)
-    for i in range(1, song_lenth):
-        next_word, one_hot_array = predict_word(model, X_melody[i], next_word, vocab, index2word)
+    for i in range(1, song_length):
+        next_word, one_hot_array = predict_word(model, X_melody[i], next_word, words_dict, reverse_word_dict)
         song.append(next_word)
 
     return song
 
 def load(path:str):
     return load_model(path)
-
-
-
-
-
-
