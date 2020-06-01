@@ -43,7 +43,7 @@ def train_model(model, X, y, vocab_size):
         X_melody.append(normalize(array))
     X_melody = np.array(X_melody)
     batch_size = 1024
-    epochs = 10
+    epochs = 2
     x = [X_melody, X_lyrics]
     history = model.fit(x=x,
               y=y,

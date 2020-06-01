@@ -41,8 +41,8 @@ if not os.path.exists(TRAIN_PATH) or start_fresh:
     with open(TEST_PATH, 'wb') as f:
         pickle.dump([x_test, y_test], f)
 else:
-    with open(TRAIN_PATH, 'rb') as f:
-        X_train, y_train = pickle.load(f)
+    # with open(TRAIN_PATH, 'rb') as f:
+    #     X_train, y_train = pickle.load(f)
     with open(TEST_PATH, 'rb') as f:
         x_test, y_test = pickle.load(f)
     with open('embedding_matrix.pickle', 'rb') as handle:
