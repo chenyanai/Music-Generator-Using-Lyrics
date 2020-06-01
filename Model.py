@@ -1,7 +1,9 @@
+from gensim.models import KeyedVectors
 from tensorflow.keras.layers import Flatten, Embedding, Dense, GRU, TimeDistributed, LSTM, Dropout, Concatenate
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras import Model, Input
+from tensorflow.keras.models import load_model
 import numpy as np
 from Preprocessing import one_hot_by_max_value
 from datetime import datetime
@@ -41,9 +43,9 @@ def train_model(model, X, y, vocab_size):
         X_melody.append(normalize(array))
     X_melody = np.array(X_melody)
     batch_size = 1024
-    epochs = 200
-
-    history = model.fit(x=[X_melody, X_lyrics],
+    epochs = 10
+    x = [X_melody, X_lyrics]
+    history = model.fit(x=x,
               y=y,
               batch_size=batch_size,
               epochs=epochs,
@@ -54,4 +56,41 @@ def train_model(model, X, y, vocab_size):
 
     model.save("model.h5")
     return history
+
+def predict_word(model:Model, melody, word:str, vocab:dict, index2word):
+    word_index = vocab[word].index
+    X = [np.array([melody]), np.vstack([word_index])]
+    predicted_vec = model.predict(X)
+    max_index = np.argmax(predicted_vec)
+    one_hot_array = np.zeros((1, len(vocab) + 1))
+    one_hot_array[max_index] = 1
+    next_word = index2word[max_index]
+    return next_word, one_hot_array
+
+
+def generate_song(model:Model, X, we:KeyedVectors, song_lenth=50):
+    first_word = 'hi' # TODO change to random pick from vocab
+    song = [first_word]
+    vocab = we.wv.vocab
+    index2word = we.index2word
+    melody = X['melody_vectors'][:song_lenth]
+    X_melody = []
+    for array in melody:
+        X_melody.append(normalize(array))
+    X_melody = np.array(X_melody)
+    next_word, one_hot_array = predict_word(model, X_melody[0], first_word, vocab, index2word)
+    song.append(next_word)
+    for i in range(1, song_lenth):
+        next_word, one_hot_array = predict_word(model, X_melody[i], next_word, vocab, index2word)
+        song.append(next_word)
+
+    return song
+
+def load(path:str):
+    return load_model(path)
+
+
+
+
+
 

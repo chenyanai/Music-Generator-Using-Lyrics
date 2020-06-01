@@ -22,7 +22,7 @@ if not os.path.exists(TRAIN_PATH) or start_fresh:
 
     # train_midis, train, test_midis, test = Preprocessing.load_data(r'Data')
 
-    train_midis, train, test_midis, test, embedding_matrix, vocab_size = Preprocessing.load_data(r'Data')
+    train_midis, train, test_midis, test, embedding_matrix, vocab_size, we_model = Preprocessing.load_data(r'Data')
 
     train_df = pd.DataFrame.from_records(list(train_midis.values()), columns=['md','lyrics'])
     test_df = pd.DataFrame.from_records(list(test_midis.values()), columns=['md','lyrics'])
@@ -48,14 +48,18 @@ else:
     with open('embedding_matrix.pickle', 'rb') as handle:
         embedding_matrix = pickle.load(handle)
     vocab_size = embedding_matrix.shape[0]-1
+    we_model = WordEmbedding()
 
 print(f'vocab_size: {vocab_size}')
 
 mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 
-model = Model.build_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size,
-                          embedding_matrix=embedding_matrix,vocab_size=vocab_size)
-
-history = Model.train_model(model, X_train, y_train, vocab_size)
+# model = Model.build_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size,
+#                           embedding_matrix=embedding_matrix,vocab_size=vocab_size)
+# history= Model.train_model(model, X_train, y_train, vocab_size)
 # Model.train_model(model, x_test, y_test)
+
+model = Model.load("model.h5")
+model.summary()
+song = Model.generate_song(model, x_test, we=we_model.model)
 

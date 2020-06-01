@@ -56,7 +56,7 @@ def load_data(data_path):
     test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
     train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
 
-    return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size
+    return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size, we_model
 
 
 def prepare_lyrics(test_index, train_index, we_model):
