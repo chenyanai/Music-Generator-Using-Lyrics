@@ -10,9 +10,6 @@ import pickle
 
 from WordEmbedding import WordEmbedding
 
-# # loading
-# with open('tokenizer.pickle', 'rb') as handle:
-#     tokenizer = pickle.load(handle)
 
 DATA_PATH = r'\Data'
 
@@ -20,19 +17,14 @@ def load_data(data_path):
     frames_columns = ['artist', 'song_name', 'lyrics']
 
     train_path = os.path.join(data_path, 'lyrics_train_set.csv')
-    train_index = pd.read_csv(train_path)
-    train_index = train_index.iloc[:, : 3]
-    train_index.columns = frames_columns
-    train_index['lyrics'] = train_index.lyrics.apply(clean_text)
+    train_index = load_lyrics(train_path, frames_columns)
 
     test_path = os.path.join(data_path, 'lyrics_test_set.csv')
-    test_index = pd.read_csv(test_path)
-    test_index = test_index.iloc[:, : 3]
-    test_index.columns = frames_columns
-    test_index['song_name'] = [name[1:] for name in test_index['song_name']]
-    test_index['lyrics'] = test_index.lyrics.apply(clean_text)
+    test_index = load_lyrics(test_path, frames_columns)
+    test_index['song_name'] = [song_name[1:] for song_name in test_index['song_name'].values]
 
     we_model = WordEmbedding()
+    # we_model = None
 
     tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
 
@@ -43,13 +35,13 @@ def load_data(data_path):
     with open('embedding_matrix.pickle', 'wb') as handle:
         pickle.dump(embedding_matrix, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # with open('tokenizer.pickle', 'rb') as handle:
+    # with open('Data/tokenizer.pickle', 'rb') as handle:
     #     tokenizer = pickle.load(handle)
     #
-    # with open('embedding_matrix.pickle', 'rb') as handle:
+    # with open('Data/embedding_matrix.pickle', 'rb') as handle:
     #     embedding_matrix = pickle.load(handle)
-    #
-    # vocab_size = len(tokenizer.word_index)
+
+    vocab_size = len(tokenizer.word_index)
 
     midi_path = os.path.join(data_path, 'midi_files')
     train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
@@ -57,6 +49,15 @@ def load_data(data_path):
     train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
 
     return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size, we_model
+
+
+def load_lyrics(data_path, frames_columns):
+    df = pd.read_csv(data_path)
+    df = df.iloc[:, : 3]
+    df.columns = frames_columns
+    df['lyrics'] = df.lyrics.apply(clean_text)
+    df['lyrics'] = [lyric + ' EOS' for lyric in df['lyrics']]
+    return df
 
 
 def prepare_lyrics(test_index, train_index, we_model):
@@ -77,6 +78,9 @@ def create_vectors_matrix(tokenizer, vocab_size, we_model):
         embedding_vector = we_model.get_word_vec(word)
         if embedding_vector is not None:
             embedding_matrix[i] = embedding_vector
+        else:
+            # TODO: try give zeros for eos only and change trainable to false
+            embedding_matrix[i] = np.random.rand(300)
 
     return embedding_matrix
 
@@ -86,26 +90,26 @@ def clean_text(text:str)->str:
     text = text.replace('&', '')
     text = text.replace('--', '')
     text = text.replace(':', '')
-    # text = text.replace('[chorus:]', '')
-    # text = text.replace('[chorus: ]', '')
     return text
 
 def read_midi_files(path, train_index, test_index, vocab_size):
     train_midi_dict = {}
     test_midi_dict = {}
+    # i = 0
     for file in tqdm(os.listdir(path)):
+        # i += 1
+        # if i < 20:
+
         file_path = os.path.join(path, file)
         song_name = get_song_name_from_file_name(file)
+
+        if song_name[0] == ' ':
+            song_name = song_name[1:]
+
         if song_name in train_index['song_name'].values:
             try:
                 pm = pretty_midi.PrettyMIDI(file_path)
                 song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
-
-                # one_hot_lyrics = np.zeros((len(song_lyrics), vocab_size + 1))
-                # one_hot_lyrics[np.arange(len(song_lyrics)), song_lyrics] = 1
-
-                # song_lyrics = tokenizer.texts_to_matrix(one_hot_lyrics)
-
                 train_midi_dict[file[:-4]] = [pm, song_lyrics]
             except:
                 print(file)

@@ -1,13 +1,14 @@
 from gensim.models import KeyedVectors
 from tensorflow.keras.layers import Flatten, Embedding, Dense, GRU, TimeDistributed, LSTM, Dropout, Concatenate
 from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 from tensorflow.keras import Model, Input
 from tensorflow.keras.models import load_model
 import numpy as np
 from Preprocessing import one_hot_by_max_value
 from datetime import datetime
 from sklearn.preprocessing import normalize
+import random
 
 def build_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
 
@@ -59,6 +60,7 @@ def train_model(model, X, y, vocab_size):
 
     log_dir = "Logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+    early_stopping = EarlyStopping(monitor='loss', patience=3)
 
     X_lyrics = np.vstack(X['lyrics'])
     y = one_hot_by_max_value(y, vocab_size)
@@ -68,7 +70,7 @@ def train_model(model, X, y, vocab_size):
         X_melody.append(normalize(array))
     X_melody = np.array(X_melody)
     batch_size = 1024
-    epochs = 200
+    epochs = 50
     x = [X_melody, X_lyrics]
     history = model.fit(x=x,
               y=y,
@@ -76,35 +78,26 @@ def train_model(model, X, y, vocab_size):
               epochs=epochs,
               verbose=1,
               steps_per_epoch=int(len(X_lyrics) / batch_size),
-              callbacks=[tensorboard_callback],
+              callbacks=[tensorboard_callback, early_stopping],
               )
 
-    model.save("model_new.h5")
+    model.save("model_eos_trainable.h5")
     return history
 
 def predict_word(model:Model, melody, word:str, vocab:dict, reverse_word_dict:dict):
-    # word_index = vocab[word].index
     word_index = vocab[word]
-    X = [np.array([melody]), np.vstack([word_index])]
-    # predicted_vec = model.predict(X)
     predicted_vec = model.predict(x=[np.array([melody]), np.array([word_index])])
-
-    # max_index = np.argmax(predicted_vec,)
-    max_indexes = predicted_vec[0].argsort()[-3:][::-1]
-    max_index = np.random.choice(max_indexes)
+    word_index = np.random.choice(np.arange(len(vocab)), p=predicted_vec[0])
 
     one_hot_array = np.zeros(shape=(len(vocab) + 1))
-    one_hot_array[max_index] = 1
-    # next_word = index2word[max_index]
-    next_word = reverse_word_dict[max_index]
+    one_hot_array[word_index] = 1
+    next_word = reverse_word_dict[word_index]
     return next_word, one_hot_array
 
 
 def generate_song(model:Model, X, words_dict, reverse_word_dict, song_length=50, ):
-    first_word = 'hi' # TODO change to random pick from vocab
+    first_word = random.choice(list(words_dict.keys()))
     song = [first_word]
-    # vocab = we.wv.vocab
-    # index2word = we.index2word
     melody = X['melody_vectors'][:song_length]
     X_melody = []
     for array in melody:
@@ -112,10 +105,11 @@ def generate_song(model:Model, X, words_dict, reverse_word_dict, song_length=50,
     X_melody = np.array(X_melody)
     next_word, one_hot_array = predict_word(model, X_melody[0], first_word, words_dict, reverse_word_dict)
     song.append(next_word)
-    for i in range(1, song_length):
+    i = 0
+    while(next_word != 'EOS' and i < len(X_melody)):
         next_word, one_hot_array = predict_word(model, X_melody[i], next_word, words_dict, reverse_word_dict)
         song.append(next_word)
-
+        i += 1
     return song
 
 def load(path:str):
