@@ -82,7 +82,7 @@ def new_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
 def train_model(model, X, y, vocab_size, melody_input_type=1):
     log_dir = "Logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
-    early_stopping = EarlyStopping(monitor='loss', patience=3)
+    early_stopping = EarlyStopping(monitor='loss', patience=3, min_delta=1e-2)
 
     X_lyrics = np.vstack(X['lyrics'])
     y = one_hot_by_max_value(y, vocab_size)
@@ -95,19 +95,21 @@ def train_model(model, X, y, vocab_size, melody_input_type=1):
     x = [X_melody, X_lyrics]
 
     if melody_input_type == 2:
-        X_tempo = X['tempo']
-        x = x + X_tempo
-    batch_size = 1024
+        X_tempo = np.array(X['tempo'])
+        x.append(X_tempo)
+        # x = x + X_tempo
+    batch_size = 512
     # batch_size = 1
-    epochs = 10
+    epochs = 100
 
     history = model.fit(x=x,
               y=y,
               batch_size=batch_size,
               epochs=epochs,
               verbose=1,
-              steps_per_epoch=int(len(X_lyrics) / batch_size),
+              # steps_per_epoch=int(len(X_lyrics) / batch_size),
               callbacks=[tensorboard_callback, early_stopping],
+              validation_split=0.2
               )
 
     model.save("model_eos_trainable_melody2.h5")

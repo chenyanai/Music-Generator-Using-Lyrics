@@ -45,14 +45,14 @@ def pp_pipeline(data_folder, seq_len=20, melody_method=1, save_data=True, embedd
         test_df['chroma_vectors'] = test_df.apply(melody_method, axis=1)
 
 
-        X_train, y_train = convert_data_to_model_input(train_df, seq_len)
-        x_test, y_test = convert_data_to_model_input(test_df, seq_len)
+        X_train, y_train = convert_data_to_model_input(train_df, seq_len, melody_method)
+        x_test = convert_data_for_prediction(test_df, seq_len, melody_method)
 
-        save_data_as_pickles(X_train, data_folder, x_test, y_test, y_train)
+        save_data_as_pickles(X_train, data_folder, x_test, y_train)
     else:
-        X_train, y_train, x_test, y_test, tokenizer, embedding_matrix, vocab_size = load_preprocessed_data(data_folder)
+        X_train, y_train, x_test, tokenizer, embedding_matrix, vocab_size = load_preprocessed_data(data_folder)
 
-    return X_train, y_train, x_test, y_test, tokenizer, embedding_matrix, vocab_size
+    return X_train, y_train, x_test, tokenizer, embedding_matrix, vocab_size
 
 
 def add_tempo_feature(test_df, train_df):
@@ -69,14 +69,14 @@ def load_preprocessed_data(data_folder):
     with open(os.path.join(data_folder, 'train_data.pickle'), 'rb') as f:
         X_train, y_train = pickle.load(f)
     with open(os.path.join(data_folder, 'test_data.pickle'), 'rb') as f:
-        x_test, y_test = pickle.load(f)
+        x_test = pickle.load(f)
     with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'rb') as handle:
         embedding_matrix = pickle.load(handle)
     with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
         tokenizer = pickle.load(handle)
 
     vocab_size = embedding_matrix.shape[0] - 1
-    return X_train, y_train, x_test, y_test, tokenizer, embedding_matrix, vocab_size
+    return X_train, y_train, x_test, tokenizer, embedding_matrix, vocab_size
 
 
 def load_midi_files(data_folder, test_index, train_index, vocab_size):
@@ -87,33 +87,11 @@ def load_midi_files(data_folder, test_index, train_index, vocab_size):
     return test_df, test_midis, train_df, train_midis
 
 
-def save_data_as_pickles(X_train, data_folder, x_test, y_test, y_train):
+def save_data_as_pickles(X_train, data_folder, x_test, y_train):
     with open(os.path.join(data_folder, 'train_data.pickle'), 'wb') as f:
         pickle.dump([X_train, y_train], f)
     with open(os.path.join(data_folder, 'test_data.pickle'), 'wb') as f:
-        pickle.dump([x_test, y_test], f)
-
-
-# def load_data(data_path):
-#     test_index, train_index = load_lyrics_data(data_path)
-#
-#     we_model = WordEmbedding()
-#     # we_model = None
-#
-#     tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
-#
-#     save_processed_data(embedding_matrix, tokenizer)
-#
-#     embedding_matrix, tokenizer = load_processed_data(embedding_matrix, tokenizer)
-#
-#     vocab_size = len(tokenizer.word_index)
-#
-#     midi_path = os.path.join(data_path, 'midi_files')
-#     train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
-#     test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
-#     train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
-#
-#     return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size, we_model
+        pickle.dump(x_test, f)
 
 # First melody representation
 def add_chroma(row):
@@ -130,7 +108,7 @@ def add_piano_roll(row):
     lyrics_num = len(row['lyrics'])
     fs_value = md.get_end_time() / lyrics_num
     times_value = np.arange(0, md.get_end_time(), fs_value)
-    return md.get_piano_roll(times=times_value)
+    return md.get_piano_roll(times=times_value).T
 
     # instruments_data = {}
     # for instrument in md.instruments:
@@ -254,8 +232,7 @@ def get_song_name_from_file_name(file_name):
     name = name.replace('_', ' ')
     return name.lower()
 
-def convert_data_to_model_input(df, sequence_length):
-    # TODO: add an option to adjust it to the new model structure
+def convert_data_to_model_input(df, sequence_length, melody_method):
     """
 
     :param df:
@@ -271,7 +248,8 @@ def convert_data_to_model_input(df, sequence_length):
 
     X = {
         'lyrics': list(),
-        'melody_vectors': list()
+        'melody_vectors': list(),
+        'tempo': list()
     }
     y = list()
 
@@ -286,8 +264,51 @@ def convert_data_to_model_input(df, sequence_length):
                         try:
                             X['lyrics'].append(song_data['lyrics'][j + sequence_length])
                             X['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
+                            if melody_method == 2:
+                                X['tempo'].append(song_data['tempo'])
                             y.append(song_data['lyrics'][j + sequence_length + 1])
                         except:
-                            print('hi')
+                            continue
     y = np.vstack(y)
     return X, y
+
+
+def convert_data_for_prediction(df, sequence_length, melody_method):
+    """
+
+    :param df:
+                df columns:
+                    md - prettyMIDI object
+                    lyrics - string with the song lyrics
+                    lyrics_vectors - list of numpy arrays, each array is 300 long and represents the embedding of a
+                    word in the lyrics
+                    chroma_vectors - numpy array that contains data on the melody, the length of the array equals to
+                    the number of the words in the lyrics
+    :return: data fitted to be used for training the model
+    """
+
+    X = list()
+
+    for i, song_data in df.iterrows():
+
+        melody_data = song_data['chroma_vectors']
+
+        Xi = {
+            # 'lyrics': list(),
+            'melody_vectors': list(),
+            'tempo': list()
+        }
+
+        if len(melody_data) >= sequence_length + 1:
+            for j in range(len(melody_data)):
+                if len(melody_data) > j + sequence_length + 1:
+                    if len(song_data['lyrics']) > j + sequence_length + 1:
+                        try:
+                            Xi['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
+                            if melody_method == 2:
+                                Xi['tempo'].append(song_data['tempo'])
+                        except:
+                            continue
+        X.append(Xi)
+
+    return X
