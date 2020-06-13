@@ -3,6 +3,7 @@ import pretty_midi
 from tqdm import tqdm
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
+from sklearn.preprocessing import MinMaxScaler
 import os
 import re
 import numpy as np
@@ -13,42 +14,157 @@ from WordEmbedding import WordEmbedding
 
 DATA_PATH = r'\Data'
 
-def load_data(data_path):
-    frames_columns = ['artist', 'song_name', 'lyrics']
 
-    train_path = os.path.join(data_path, 'lyrics_train_set.csv')
-    train_index = load_lyrics(train_path, frames_columns)
+def pp_pipeline(data_folder, seq_len=20, melody_method=1, save_data=True, embedding_model_path='Data/GoogleNews-vectors-negative300.bin'):
 
-    test_path = os.path.join(data_path, 'lyrics_test_set.csv')
-    test_index = load_lyrics(test_path, frames_columns)
-    test_index['song_name'] = [song_name[1:] for song_name in test_index['song_name'].values]
+    if save_data:
 
-    we_model = WordEmbedding()
-    # we_model = None
+        test_index, train_index = load_lyrics_data(data_folder)
 
-    tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
+        we_model = WordEmbedding(path=embedding_model_path)
+        tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
+        save_processed_data(embedding_matrix, tokenizer)
 
-    #saving
+        # with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'rb') as handle:
+        #     embedding_matrix = pickle.load(handle)
+        # with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
+        #     tokenizer = pickle.load(handle)
+
+        train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
+        test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
+
+        test_df, test_midis, train_df, train_midis = load_midi_files(data_folder, test_index, train_index, 300)
+
+        if melody_method == 1:
+            melody_method = add_chroma
+        else:
+            melody_method = add_piano_roll
+            add_tempo_feature(test_df, train_df)
+
+        train_df['chroma_vectors'] = train_df.apply(melody_method, axis=1)
+        test_df['chroma_vectors'] = test_df.apply(melody_method, axis=1)
+
+
+        X_train, y_train = convert_data_to_model_input(train_df, seq_len)
+        x_test, y_test = convert_data_to_model_input(test_df, seq_len)
+
+        save_data_as_pickles(X_train, data_folder, x_test, y_test, y_train)
+    else:
+        X_train, y_train, x_test, y_test, tokenizer, embedding_matrix, vocab_size = load_preprocessed_data(data_folder)
+
+    return X_train, y_train, x_test, y_test, tokenizer, embedding_matrix, vocab_size
+
+
+def add_tempo_feature(test_df, train_df):
+    train_tempo = train_df.apply(get_tempo, axis=1)
+    test_tempo = test_df.apply(get_tempo, axis=1)
+    scaler = MinMaxScaler()
+    scaler.fit(pd.concat([train_tempo, test_tempo]).values.reshape(-1, 1))
+    train_df['tempo'] = scaler.transform(train_tempo.values.reshape(-1, 1))
+    test_df['tempo'] = scaler.transform(test_tempo.values.reshape(-1, 1))
+
+
+def load_preprocessed_data(data_folder):
+
+    with open(os.path.join(data_folder, 'train_data.pickle'), 'rb') as f:
+        X_train, y_train = pickle.load(f)
+    with open(os.path.join(data_folder, 'test_data.pickle'), 'rb') as f:
+        x_test, y_test = pickle.load(f)
+    with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'rb') as handle:
+        embedding_matrix = pickle.load(handle)
+    with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
+        tokenizer = pickle.load(handle)
+
+    vocab_size = embedding_matrix.shape[0] - 1
+    return X_train, y_train, x_test, y_test, tokenizer, embedding_matrix, vocab_size
+
+
+def load_midi_files(data_folder, test_index, train_index, vocab_size):
+    midi_path = os.path.join(data_folder, 'midi_files')
+    train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
+    train_df = pd.DataFrame.from_records(list(train_midis.values()), columns=['md', 'lyrics'])
+    test_df = pd.DataFrame.from_records(list(test_midis.values()), columns=['md', 'lyrics'])
+    return test_df, test_midis, train_df, train_midis
+
+
+def save_data_as_pickles(X_train, data_folder, x_test, y_test, y_train):
+    with open(os.path.join(data_folder, 'train_data.pickle'), 'wb') as f:
+        pickle.dump([X_train, y_train], f)
+    with open(os.path.join(data_folder, 'test_data.pickle'), 'wb') as f:
+        pickle.dump([x_test, y_test], f)
+
+
+# def load_data(data_path):
+#     test_index, train_index = load_lyrics_data(data_path)
+#
+#     we_model = WordEmbedding()
+#     # we_model = None
+#
+#     tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
+#
+#     save_processed_data(embedding_matrix, tokenizer)
+#
+#     embedding_matrix, tokenizer = load_processed_data(embedding_matrix, tokenizer)
+#
+#     vocab_size = len(tokenizer.word_index)
+#
+#     midi_path = os.path.join(data_path, 'midi_files')
+#     train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
+#     test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
+#     train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
+#
+#     return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size, we_model
+
+# First melody representation
+def add_chroma(row):
+    md = row['md']
+    lyrics_num = len(row['lyrics'])
+    fs_value = md.get_end_time() / lyrics_num
+    times_value = np.arange(0, md.get_end_time(), fs_value)
+    return md.get_chroma(fs=fs_value, times=times_value).T
+
+# Second melody representation
+# TODO: check that it works
+def add_piano_roll(row):
+    md = row['md']
+    lyrics_num = len(row['lyrics'])
+    fs_value = md.get_end_time() / lyrics_num
+    times_value = np.arange(0, md.get_end_time(), fs_value)
+    return md.get_piano_roll(times=times_value)
+
+    # instruments_data = {}
+    # for instrument in md.instruments:
+    #     if instrument.name in instrument_list:
+    #         instruments_data[instrument.name] = instrument.get_chroma(fs=fs_value, times=times_value).T
+
+    # return np.hstack(instruments_data.values())
+
+def get_tempo(row):
+    return row['md'].estimate_tempo()
+
+def load_processed_data():
+    with open('Data/tokenizer.pickle', 'rb') as handle:
+        tokenizer = pickle.load(handle)
+    with open('Data/embedding_matrix.pickle', 'rb') as handle:
+        embedding_matrix = pickle.load(handle)
+    return embedding_matrix, tokenizer
+
+
+def save_processed_data(embedding_matrix, tokenizer):
     with open('tokenizer.pickle', 'wb') as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
     with open('embedding_matrix.pickle', 'wb') as handle:
         pickle.dump(embedding_matrix, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # with open('Data/tokenizer.pickle', 'rb') as handle:
-    #     tokenizer = pickle.load(handle)
-    #
-    # with open('Data/embedding_matrix.pickle', 'rb') as handle:
-    #     embedding_matrix = pickle.load(handle)
 
-    vocab_size = len(tokenizer.word_index)
-
-    midi_path = os.path.join(data_path, 'midi_files')
-    train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
-    test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
-    train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
-
-    return train_midis, train_index, test_midis, test_index, embedding_matrix, vocab_size, we_model
+def load_lyrics_data(data_path):
+    frames_columns = ['artist', 'song_name', 'lyrics']
+    train_path = os.path.join(data_path, 'lyrics_train_set.csv')
+    train_index = load_lyrics(train_path, frames_columns)
+    test_path = os.path.join(data_path, 'lyrics_test_set.csv')
+    test_index = load_lyrics(test_path, frames_columns)
+    test_index['song_name'] = [song_name[1:] for song_name in test_index['song_name'].values]
+    return test_index, train_index
 
 
 def load_lyrics(data_path, frames_columns):
@@ -95,11 +211,7 @@ def clean_text(text:str)->str:
 def read_midi_files(path, train_index, test_index, vocab_size):
     train_midi_dict = {}
     test_midi_dict = {}
-    # i = 0
     for file in tqdm(os.listdir(path)):
-        # i += 1
-        # if i < 20:
-
         file_path = os.path.join(path, file)
         song_name = get_song_name_from_file_name(file)
 
@@ -112,17 +224,17 @@ def read_midi_files(path, train_index, test_index, vocab_size):
                 song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
                 train_midi_dict[file[:-4]] = [pm, song_lyrics]
             except:
-                print(file)
+                continue
+
         elif song_name in test_index['song_name'].values:
             try:
                 pm = pretty_midi.PrettyMIDI(file_path)
                 song_lyrics = test_index[test_index['song_name'] == song_name]['lyrics_sequence'].values[0]
-
-                one_hot_by_max_value(song_lyrics, vocab_size)
+                # one_hot_by_max_value(song_lyrics, vocab_size)
 
                 test_midi_dict[file[:-4]] = [pm, song_lyrics]
             except:
-                print(file)
+                continue
 
     return train_midi_dict, test_midi_dict
 
@@ -143,6 +255,7 @@ def get_song_name_from_file_name(file_name):
     return name.lower()
 
 def convert_data_to_model_input(df, sequence_length):
+    # TODO: add an option to adjust it to the new model structure
     """
 
     :param df:

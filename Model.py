@@ -16,7 +16,7 @@ def build_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
     lyrics_vectors_input = Input(shape=(1, ), name='lyrics_vectors_input')
 
     melody_lstm = LSTM(50, return_sequences=False, name='melody_LSTM')(melody_input)
-    lyrics_embedding = Embedding(vocab_size + 1, 300, weights=[embedding_matrix], input_length=1, trainable=False)\
+    lyrics_embedding = Embedding(vocab_size + 1, 300, weights=[embedding_matrix], input_length=1, trainable=True)\
         (lyrics_vectors_input)
     lyrics_flatten = Flatten()(lyrics_embedding)
 
@@ -30,6 +30,29 @@ def build_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['mse'])
     model.summary()
     return model
+
+def new_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
+
+    melody_input = Input(shape=(sequence_length, mid_data_len, ), name='melody_input')
+    lyrics_vectors_input = Input(shape=(1, ), name='lyrics_vectors_input')
+    tempo_input = Input(shape=(1, ), name='tempo_input')
+
+    melody_lstm = LSTM(50, return_sequences=False, name='melody_LSTM')(melody_input)
+    lyrics_embedding = Embedding(vocab_size + 1, 300, weights=[embedding_matrix], input_length=1, trainable=True)\
+        (lyrics_vectors_input)
+    lyrics_flatten = Flatten()(lyrics_embedding)
+
+    lyrics_melody_concat = Concatenate(axis=-1, name='lyrics_melody_concat')([lyrics_flatten, melody_lstm, tempo_input])
+
+    dense = Dense(500, activation='relu', name='first_dense')(lyrics_melody_concat)
+    dropout = Dropout(0.1)(dense)
+    dense = Dense(vocab_size + 1, activation='softmax', name='last_dense')(dropout) # Predicting the next locations of the defense players
+
+    model = Model(inputs=[melody_input, lyrics_vectors_input, tempo_input], outputs=dense)
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['mse'])
+    model.summary()
+    return model
+
 
 # def build_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
 #
@@ -56,8 +79,8 @@ def build_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
 #     model.summary()
 #     return model
 
-def train_model(model, X, y, vocab_size):
-
+def train_model(model, X, y, vocab_size, melody_input_type=1):
+    # TODO: change inputs according to melody type
     log_dir = "Logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     early_stopping = EarlyStopping(monitor='loss', patience=3)
@@ -69,9 +92,16 @@ def train_model(model, X, y, vocab_size):
     for array in X['melody_vectors']:
         X_melody.append(normalize(array))
     X_melody = np.array(X_melody)
-    batch_size = 1024
-    epochs = 50
+
     x = [X_melody, X_lyrics]
+
+    if melody_input_type == 2:
+        X_tempo = X['tempo']
+        x = x + X_tempo
+    batch_size = 1024
+    # batch_size = 1
+    epochs = 10
+
     history = model.fit(x=x,
               y=y,
               batch_size=batch_size,
@@ -81,7 +111,7 @@ def train_model(model, X, y, vocab_size):
               callbacks=[tensorboard_callback, early_stopping],
               )
 
-    model.save("model_eos_trainable.h5")
+    model.save("model_eos_trainable_melody2.h5")
     return history
 
 def predict_word(model:Model, melody, word:str, vocab:dict, reverse_word_dict:dict):
