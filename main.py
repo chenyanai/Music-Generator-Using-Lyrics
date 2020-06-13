@@ -4,11 +4,11 @@ import pickle
 from tensorflow.keras.utils import plot_model
 
 
-SEQ_LEN = 20
+SEQ_LEN = 5
 TRAIN_PATH = 'Data/train_data.pickle'
 TEST_PATH = 'Data/test_data.pickle'
 
-start_fresh = False
+start_fresh = True
 train_model = True
 melody_type = 2
 
@@ -20,9 +20,13 @@ print(f'vocab_size: {vocab_size}')
 mid_vector_size = len(x_test['melody_vectors'][0][0:5][0])
 
 if train_model:
-    model = Model.new_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size,
+    if melody_type == 1:
+        model = Model.build_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size,
                               embedding_matrix=embedding_matrix,vocab_size=vocab_size)
-    # model.summary()
+    else:
+        model = Model.new_model(sequence_length=SEQ_LEN, mid_data_len=mid_vector_size,
+                                embedding_matrix=embedding_matrix, vocab_size=vocab_size)
+    model.summary()
     # plot_model(model, to_file='new_model_plot.png', show_shapes=True, show_layer_names=True)
     history = Model.train_model(model, X_train, y_train, vocab_size, melody_input_type=melody_type)
 # Model.train_model(model, x_test, y_test)

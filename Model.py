@@ -80,7 +80,6 @@ def new_model(sequence_length, mid_data_len, embedding_matrix, vocab_size):
 #     return model
 
 def train_model(model, X, y, vocab_size, melody_input_type=1):
-    # TODO: change inputs according to melody type
     log_dir = "Logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     early_stopping = EarlyStopping(monitor='loss', patience=3)
