@@ -4,7 +4,7 @@ import pickle
 from tensorflow.keras.utils import plot_model
 
 
-SEQ_LEN = 5
+SEQ_LEN = 20
 TRAIN_PATH = 'Data/train_data.pickle'
 TEST_PATH = 'Data/test_data.pickle'
 
@@ -32,7 +32,7 @@ else:
     if melody_type == 1:
         model = Model.load("model_eos_trainable_melody1.h5")
     else:
-        model = Model.load("model_eos_trainable_melody2.h5")
+        model = Model.load("model_eos_trainable_melody2_1024b_5e.h5")
 
 
 reverse_word_map = dict(map(reversed, tokenizer.word_index.items()))

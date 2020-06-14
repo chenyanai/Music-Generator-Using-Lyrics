@@ -76,7 +76,7 @@ def train_model(model, X, y, vocab_size, melody_input_type=1):
         # x = x + X_tempo
     batch_size = 1024
     # batch_size = 1
-    epochs = 5
+    epochs = 100
 
     history = model.fit(x=x,
               y=y,
@@ -97,8 +97,11 @@ def predict_word(model:Model, melody, word:str, vocab:dict, reverse_word_dict:di
         x = [np.array([melody]), np.array([word_index]), np.array([tempo])]
     else:
         x = [np.array([melody]), np.array([word_index])]
+
     predicted_vec = model.predict(x=x)
+    # predicted_vec[0][word_index] = 0
     word_index = np.random.choice(np.arange(len(vocab) + 1), p=predicted_vec[0])
+
     one_hot_array = np.zeros(shape=(len(vocab) + 1))
     one_hot_array[word_index] = 1
     next_word = reverse_word_dict[word_index]
@@ -120,8 +123,8 @@ def generate_song(model:Model, X, words_dict, reverse_word_dict, song_length=50,
                                                 X['tempo'][0])
     song.append(next_word)
     i = 0
-    while(next_word != 'EOS' and i < len(X_melody)):
-        next_word, one_hot_array = predict_word(model, X_melody[0], first_word, words_dict, reverse_word_dict,
+    while(next_word != 'eos' and i < len(X_melody)):
+        next_word, one_hot_array = predict_word(model, X_melody[0], next_word, words_dict, reverse_word_dict,
                                                 X['tempo'][i])
         song.append(next_word)
         i += 1

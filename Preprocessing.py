@@ -21,15 +21,15 @@ def pp_pipeline(data_folder, seq_len=20, melody_type=1, save_data=True, embeddin
 
         test_index, train_index = load_lyrics_data(data_folder)
 
-        we_model = WordEmbedding(path=embedding_model_path)
-        tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
-        save_processed_data(data_folder, embedding_matrix, tokenizer)
+        # we_model = WordEmbedding(path=embedding_model_path)
+        # tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
+        # save_processed_data(data_folder, embedding_matrix, tokenizer)
 
-        # with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'rb') as handle:
-        #     embedding_matrix = pickle.load(handle)
-        # with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
-        #     tokenizer = pickle.load(handle)
-        # vocab_size = len(tokenizer.word_index)
+        with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'rb') as handle:
+            embedding_matrix = pickle.load(handle)
+        with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
+            tokenizer = pickle.load(handle)
+        vocab_size = len(tokenizer.word_index)
 
         train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
         test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
@@ -44,7 +44,6 @@ def pp_pipeline(data_folder, seq_len=20, melody_type=1, save_data=True, embeddin
 
         train_df['chroma_vectors'] = train_df.apply(melody_method, axis=1)
         test_df['chroma_vectors'] = test_df.apply(melody_method, axis=1)
-
 
         X_train, y_train = convert_data_to_model_input(train_df, seq_len, melody_type)
         x_test = convert_data_for_prediction(test_df, seq_len, melody_type)
@@ -100,7 +99,10 @@ def add_chroma(row):
     lyrics_num = len(row['lyrics'])
     fs_value = md.get_end_time() / lyrics_num
     times_value = np.arange(0, md.get_end_time(), fs_value)
-    return md.get_chroma(fs=fs_value, times=times_value).T
+    chroma = md.get_chroma(fs=fs_value, times=times_value).T
+    nan_locs = np.isnan(chroma)
+    chroma[nan_locs] = 0
+    return chroma
 
 # Second melody representation
 # TODO: check that it works
@@ -109,7 +111,10 @@ def add_piano_roll(row):
     lyrics_num = len(row['lyrics'])
     fs_value = md.get_end_time() / lyrics_num
     times_value = np.arange(0, md.get_end_time(), fs_value)
-    return md.get_piano_roll(fs=fs_value, times=times_value).T
+    piano_roll = md.get_piano_roll(fs=fs_value, times=times_value).T
+    nan_locs = np.isnan(piano_roll)
+    piano_roll[nan_locs] = 0
+    return piano_roll
 
     # instruments_data = {}
     # for instrument in md.instruments:
