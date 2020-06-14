@@ -15,7 +15,7 @@ from WordEmbedding import WordEmbedding
 DATA_PATH = r'\Data'
 
 
-def pp_pipeline(data_folder, seq_len=20, melody_method=1, save_data=True, embedding_model_path='Data/GoogleNews-vectors-negative300.bin'):
+def pp_pipeline(data_folder, seq_len=20, melody_type=1, save_data=True, embedding_model_path='Data/GoogleNews-vectors-negative300.bin'):
 
     if save_data:
 
@@ -23,19 +23,20 @@ def pp_pipeline(data_folder, seq_len=20, melody_method=1, save_data=True, embedd
 
         we_model = WordEmbedding(path=embedding_model_path)
         tokenizer, embedding_matrix, vocab_size = prepare_lyrics(test_index, train_index, we_model)
-        save_processed_data(embedding_matrix, tokenizer)
+        save_processed_data(data_folder, embedding_matrix, tokenizer)
 
         # with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'rb') as handle:
         #     embedding_matrix = pickle.load(handle)
         # with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
         #     tokenizer = pickle.load(handle)
+        # vocab_size = len(tokenizer.word_index)
 
         train_index['lyrics_sequence'] = tokenizer.texts_to_sequences(train_index['lyrics'])
         test_index['lyrics_sequence'] = tokenizer.texts_to_sequences(test_index['lyrics'])
 
         test_df, test_midis, train_df, train_midis = load_midi_files(data_folder, test_index, train_index, 300)
 
-        if melody_method == 1:
+        if melody_type == 1:
             melody_method = add_chroma
         else:
             melody_method = add_piano_roll
@@ -45,8 +46,8 @@ def pp_pipeline(data_folder, seq_len=20, melody_method=1, save_data=True, embedd
         test_df['chroma_vectors'] = test_df.apply(melody_method, axis=1)
 
 
-        X_train, y_train = convert_data_to_model_input(train_df, seq_len, melody_method)
-        x_test = convert_data_for_prediction(test_df, seq_len, melody_method)
+        X_train, y_train = convert_data_to_model_input(train_df, seq_len, melody_type)
+        x_test = convert_data_for_prediction(test_df, seq_len, melody_type)
 
         save_data_as_pickles(X_train, data_folder, x_test, y_train)
     else:
@@ -75,13 +76,13 @@ def load_preprocessed_data(data_folder):
     with open(os.path.join(data_folder, 'tokenizer.pickle'), 'rb') as handle:
         tokenizer = pickle.load(handle)
 
-    vocab_size = embedding_matrix.shape[0] - 1
+    vocab_size = embedding_matrix.shape[0]
     return X_train, y_train, x_test, tokenizer, embedding_matrix, vocab_size
 
 
 def load_midi_files(data_folder, test_index, train_index, vocab_size):
     midi_path = os.path.join(data_folder, 'midi_files')
-    train_midis, test_midis = read_midi_files(midi_path, train_index, test_index, vocab_size)
+    train_midis, test_midis = read_midi_files(midi_path, train_index, test_index)
     train_df = pd.DataFrame.from_records(list(train_midis.values()), columns=['md', 'lyrics'])
     test_df = pd.DataFrame.from_records(list(test_midis.values()), columns=['md', 'lyrics'])
     return test_df, test_midis, train_df, train_midis
@@ -108,7 +109,7 @@ def add_piano_roll(row):
     lyrics_num = len(row['lyrics'])
     fs_value = md.get_end_time() / lyrics_num
     times_value = np.arange(0, md.get_end_time(), fs_value)
-    return md.get_piano_roll(times=times_value).T
+    return md.get_piano_roll(fs=fs_value, times=times_value).T
 
     # instruments_data = {}
     # for instrument in md.instruments:
@@ -128,10 +129,10 @@ def load_processed_data():
     return embedding_matrix, tokenizer
 
 
-def save_processed_data(embedding_matrix, tokenizer):
-    with open('tokenizer.pickle', 'wb') as handle:
+def save_processed_data(data_folder, embedding_matrix, tokenizer):
+    with open(os.path.join(data_folder, 'tokenizer.pickle'), 'wb') as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open('embedding_matrix.pickle', 'wb') as handle:
+    with open(os.path.join(data_folder, 'embedding_matrix.pickle'), 'wb') as handle:
         pickle.dump(embedding_matrix, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -160,14 +161,14 @@ def prepare_lyrics(test_index, train_index, we_model):
     lyrics = list(train_index['lyrics'].values) + list(test_index['lyrics'].values)
     tokenizer.fit_on_texts(lyrics)
     vocab_size = len(tokenizer.word_index)
-    embedding_matrix = create_vectors_matrix(tokenizer, vocab_size, we_model)
+    embedding_matrix = create_vectors_matrix(tokenizer, vocab_size + 1, we_model)
 
     return tokenizer, embedding_matrix, vocab_size
 
 def create_vectors_matrix(tokenizer, vocab_size, we_model):
     # create a weight matrix for words in training docs
 
-    embedding_matrix = np.zeros((vocab_size+1, 300))
+    embedding_matrix = np.zeros((vocab_size, 300))
     for word, i in tokenizer.word_index.items():
         embedding_vector = we_model.get_word_vec(word)
         if embedding_vector is not None:
@@ -186,9 +187,10 @@ def clean_text(text:str)->str:
     text = text.replace(':', '')
     return text
 
-def read_midi_files(path, train_index, test_index, vocab_size):
+def read_midi_files(path, train_index, test_index):
     train_midi_dict = {}
     test_midi_dict = {}
+    i = 0
     for file in tqdm(os.listdir(path)):
         file_path = os.path.join(path, file)
         song_name = get_song_name_from_file_name(file)
@@ -198,6 +200,8 @@ def read_midi_files(path, train_index, test_index, vocab_size):
 
         if song_name in train_index['song_name'].values:
             try:
+                # if i < 10:
+                #     i += 1
                 pm = pretty_midi.PrettyMIDI(file_path)
                 song_lyrics = train_index[train_index['song_name'] == song_name]['lyrics_sequence'].values[0]
                 train_midi_dict[file[:-4]] = [pm, song_lyrics]
@@ -218,7 +222,7 @@ def read_midi_files(path, train_index, test_index, vocab_size):
 
 
 def one_hot_by_max_value(data, vocab_size):
-    one_hot_array = to_categorical(data, num_classes=vocab_size + 1)
+    one_hot_array = to_categorical(data, num_classes=vocab_size)
     # one_hot_array = np.zeros((len(data), vocab_size + 1))
     # one_hot_array[np.arange(len(data)), data] = 1
     return one_hot_array
@@ -232,7 +236,7 @@ def get_song_name_from_file_name(file_name):
     name = name.replace('_', ' ')
     return name.lower()
 
-def convert_data_to_model_input(df, sequence_length, melody_method):
+def convert_data_to_model_input(df, sequence_length, melody_type):
     """
 
     :param df:
@@ -264,7 +268,7 @@ def convert_data_to_model_input(df, sequence_length, melody_method):
                         try:
                             X['lyrics'].append(song_data['lyrics'][j + sequence_length])
                             X['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
-                            if melody_method == 2:
+                            if melody_type == 2:
                                 X['tempo'].append(song_data['tempo'])
                             y.append(song_data['lyrics'][j + sequence_length + 1])
                         except:
@@ -273,7 +277,7 @@ def convert_data_to_model_input(df, sequence_length, melody_method):
     return X, y
 
 
-def convert_data_for_prediction(df, sequence_length, melody_method):
+def convert_data_for_prediction(df, sequence_length, melody_type):
     """
 
     :param df:
@@ -305,7 +309,7 @@ def convert_data_for_prediction(df, sequence_length, melody_method):
                     if len(song_data['lyrics']) > j + sequence_length + 1:
                         try:
                             Xi['melody_vectors'].append(song_data['chroma_vectors'][j:j + sequence_length])
-                            if melody_method == 2:
+                            if melody_type == 2:
                                 Xi['tempo'].append(song_data['tempo'])
                         except:
                             continue
