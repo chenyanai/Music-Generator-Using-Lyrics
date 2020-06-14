@@ -8,8 +8,8 @@ SEQ_LEN = 20
 TRAIN_PATH = 'Data/train_data.pickle'
 TEST_PATH = 'Data/test_data.pickle'
 
-start_fresh = True
-train_model = True
+start_fresh = False
+train_model = False
 melody_type = 2
 
 X_train, y_train, x_test, tokenizer, embedding_matrix, vocab_size = \
@@ -32,7 +32,7 @@ else:
     if melody_type == 1:
         model = Model.load("model_eos_trainable_melody1.h5")
     else:
-        model = Model.load("model_eos_trainable_melody2_1024b_5e.h5")
+        model = Model.load("model_eos_trainable_melody2.h5")
 
 
 reverse_word_map = dict(map(reversed, tokenizer.word_index.items()))

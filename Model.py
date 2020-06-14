@@ -88,7 +88,7 @@ def train_model(model, X, y, vocab_size, melody_input_type=1):
               validation_split=0.2
               )
 
-    model.save("model_eos_trainable_melody2_1024b_5e.h5")
+    model.save(f"model_eos_trainable_melody{melody_input_type}.h5")
     return history
 
 def predict_word(model:Model, melody, word:str, vocab:dict, reverse_word_dict:dict, tempo=None):
@@ -124,8 +124,11 @@ def generate_song(model:Model, X, words_dict, reverse_word_dict, song_length=50,
     song.append(next_word)
     i = 0
     while(next_word != 'eos' and i < len(X_melody)):
-        next_word, one_hot_array = predict_word(model, X_melody[0], next_word, words_dict, reverse_word_dict,
-                                                X['tempo'][i])
+        if melody_type == 1:
+            next_word, one_hot_array = predict_word(model, X_melody[i], next_word, words_dict, reverse_word_dict)
+        else:
+            next_word, one_hot_array = predict_word(model, X_melody[i], next_word, words_dict, reverse_word_dict,
+                                                    X['tempo'][i])
         song.append(next_word)
         i += 1
     return song
